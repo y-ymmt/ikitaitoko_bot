@@ -8,12 +8,12 @@ Bedrock AgentCore Runtime用エントリポイント。
 import logging
 import os
 
+import requests
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
 from dotenv import load_dotenv
 from mcp import StdioServerParameters, stdio_client
-from strands import Agent
+from strands import Agent, tool
 from strands.tools.mcp import MCPClient
-from strands_tools.http_request import http_request
 from strands_tools.tavily import tavily_search
 
 # 環境変数を読み込み
@@ -62,6 +62,66 @@ NOTION_DATA_SOURCE_ID = env_vars["NOTION_DATA_SOURCE_ID"]
 # BedrockAgentCoreApp の初期化
 app = BedrockAgentCoreApp()
 
+
+@tool
+def add_place(
+    name: str,
+    category: str = "その他",
+    priority: str = "中",
+    memo: str = "",
+) -> str:
+    """
+    行きたいところリストに新しい場所を追加します。
+
+    Args:
+        name: 追加する場所の名前（必須）
+        category: カテゴリ。「旅行」「飲食店」「買い物」「その他」のいずれか。デフォルトは「その他」
+        priority: 優先度。「高」「中」「低」のいずれか。デフォルトは「中」
+        memo: メモ（任意）
+
+    Returns:
+        作成結果のメッセージ
+    """
+    valid_categories = ["旅行", "飲食店", "買い物", "その他"]
+    valid_priorities = ["高", "中", "低"]
+
+    if category not in valid_categories:
+        category = "その他"
+    if priority not in valid_priorities:
+        priority = "中"
+
+    url = "https://api.notion.com/v1/pages"
+    headers = {
+        "Authorization": f"Bearer {NOTION_TOKEN}",
+        "Content-Type": "application/json",
+        "Notion-Version": "2022-06-28",
+    }
+
+    properties = {
+        "名前": {"title": [{"type": "text", "text": {"content": name}}]},
+        "カテゴリ": {"select": {"name": category}},
+        "優先度": {"select": {"name": priority}},
+        "行った": {"checkbox": False},
+    }
+
+    if memo:
+        properties["メモ"] = {"rich_text": [{"type": "text", "text": {"content": memo}}]}
+
+    payload = {
+        "parent": {"database_id": NOTION_DATABASE_ID},
+        "properties": properties,
+    }
+
+    try:
+        response = requests.post(url, headers=headers, json=payload, timeout=30)
+        response.raise_for_status()
+        result = response.json()
+        page_url = result.get("url", "")
+        return f"「{name}」を行きたいところリストに追加しました！\nカテゴリ: {category}\n優先度: {priority}"
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Failed to add place: {e}")
+        return f"場所の追加に失敗しました: {str(e)}"
+
 # システムプロンプト
 SYSTEM_PROMPT = f"""あなたは「行きたいところリスト」を管理するアシスタントです。
 ユーザーからのメッセージに対して、親切で簡潔に日本語で応答してください。
@@ -75,10 +135,13 @@ SYSTEM_PROMPT = f"""あなたは「行きたいところリスト」を管理す
    - データベース情報を取得するには `API-retrieve-a-database` を使い、`database_id` に `{NOTION_DATABASE_ID}` を指定してください。
 
 2. **新しい場所の追加**: ユーザーが「〇〇を追加して」「行きたいところリストに△△を入れて」と言った場合、
-   Notionデータベースに新しいアイテムを作成します。
-   - `API-post-page` を使用し、parentには `database_id`: `{NOTION_DATABASE_ID}` を指定してください。
-   - 必要に応じてカテゴリ（旅行、飲食店、買い物、その他）や優先度（高・中・低）を確認してください。
-   - データベースのプロパティ: 名前(title), 行った(checkbox), カテゴリ(select), 優先度(select), 場所(place), URL(url), メモ(rich_text)
+   `add_place` ツールを使用してNotionデータベースに新しいアイテムを作成します。
+   - 引数:
+     - name: 場所の名前（必須）
+     - category: 「旅行」「飲食店」「買い物」「その他」から選択（デフォルト: その他）
+     - priority: 「高」「中」「低」から選択（デフォルト: 中）
+     - memo: メモ（任意）
+   - 必要に応じてユーザーにカテゴリや優先度を確認してください
 
 3. **場所の削除（論理削除）**: ユーザーが「〇〇を削除して」「△△を消して」と言った場合、
    該当するアイテムを論理削除します。
@@ -148,7 +211,7 @@ def get_agent() -> Agent:
             system_prompt=SYSTEM_PROMPT,
             tools=[
                 notion_mcp,
-                http_request,
+                add_place,
                 tavily_search,
             ],
             model="jp.anthropic.claude-haiku-4-5-20251001-v1:0",

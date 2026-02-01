@@ -1,8 +1,12 @@
 ---
-name: deploy
+name: deploy-agentcore
 description: |
-  AgentCore Runtimeへのデプロイ手順。コンテナデプロイでNode.js/MCPを含む環境を構築し、Notion連携機能を動作させる。
-  使用タイミング: (1) AgentCoreへの新規デプロイ、(2) コード変更後の再デプロイ、(3) デプロイ設定の確認、(4) リソースの削除
+  このスキルはユーザーが以下のように言った場合に使用してください：
+  - 「デプロイして」「AgentCoreにデプロイ」「再デプロイして」
+  - 「コード変更したからデプロイ」「変更を反映して」
+  - 「AgentCoreのステータス確認」「デプロイ状況を確認」
+  - 「agentcore deploy」の実行手順が知りたい
+  AgentCore Runtimeへのコンテナデプロイ手順を提供します。
 ---
 
 # AgentCore Deploy

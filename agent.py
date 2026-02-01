@@ -12,13 +12,13 @@ import logging
 import os
 from typing import Optional
 
+import requests as requests_lib
 from dotenv import load_dotenv
 from flask import Flask, abort, request
 from linebot.v3.exceptions import InvalidSignatureError
 from mcp import StdioServerParameters, stdio_client
-from strands import Agent
+from strands import Agent, tool
 from strands.tools.mcp import MCPClient
-from strands_tools.http_request import http_request
 from strands_tools.tavily import tavily_search
 
 from line_handler import LineHandler
@@ -82,6 +82,67 @@ line_handler = LineHandler(LINE_CHANNEL_ACCESS_TOKEN, LINE_CHANNEL_SECRET)
 # database_idからAPI-retrieve-a-databaseで取得したdata_sources[0].id
 NOTION_DATA_SOURCE_ID = os.environ.get("NOTION_DATA_SOURCE_ID", "")
 
+
+@tool
+def add_place(
+    name: str,
+    category: str = "その他",
+    priority: str = "中",
+    memo: str = "",
+) -> str:
+    """
+    行きたいところリストに新しい場所を追加します。
+
+    Args:
+        name: 追加する場所の名前（必須）
+        category: カテゴリ。「旅行」「飲食店」「買い物」「その他」のいずれか。デフォルトは「その他」
+        priority: 優先度。「高」「中」「低」のいずれか。デフォルトは「中」
+        memo: メモ（任意）
+
+    Returns:
+        作成結果のメッセージ
+    """
+    valid_categories = ["旅行", "飲食店", "買い物", "その他"]
+    valid_priorities = ["高", "中", "低"]
+
+    if category not in valid_categories:
+        category = "その他"
+    if priority not in valid_priorities:
+        priority = "中"
+
+    url = "https://api.notion.com/v1/pages"
+    headers = {
+        "Authorization": f"Bearer {NOTION_TOKEN}",
+        "Content-Type": "application/json",
+        "Notion-Version": "2022-06-28",
+    }
+
+    properties = {
+        "名前": {"title": [{"type": "text", "text": {"content": name}}]},
+        "カテゴリ": {"select": {"name": category}},
+        "優先度": {"select": {"name": priority}},
+        "行った": {"checkbox": False},
+    }
+
+    if memo:
+        properties["メモ"] = {"rich_text": [{"type": "text", "text": {"content": memo}}]}
+
+    payload = {
+        "parent": {"database_id": NOTION_DATABASE_ID},
+        "properties": properties,
+    }
+
+    try:
+        response = requests_lib.post(url, headers=headers, json=payload, timeout=30)
+        response.raise_for_status()
+        result = response.json()
+        page_url = result.get("url", "")
+        return f"「{name}」を行きたいところリストに追加しました！\nカテゴリ: {category}\n優先度: {priority}"
+    except requests_lib.exceptions.RequestException as e:
+        logger.error(f"Failed to add place: {e}")
+        return f"場所の追加に失敗しました: {str(e)}"
+
+
 # システムプロンプト
 SYSTEM_PROMPT = f"""あなたは「行きたいところリスト」を管理するアシスタントです。
 ユーザーからのLINEメッセージに対して、親切で簡潔に日本語で応答してください。
@@ -94,10 +155,13 @@ SYSTEM_PROMPT = f"""あなたは「行きたいところリスト」を管理す
    - データベース情報を取得するには `API-retrieve-a-database` を使い、`database_id` に `{NOTION_DATABASE_ID}` を指定してください。
 
 2. **新しい場所の追加**: ユーザーが「〇〇を追加して」「行きたいところリストに△△を入れて」と言った場合、
-   Notionデータベースに新しいアイテムを作成します。
-   - `API-post-page` を使用し、parentには `database_id`: `{NOTION_DATABASE_ID}` を指定してください。
-   - 必要に応じてカテゴリ（旅行、飲食店、買い物、その他）や優先度（高・中・低）を確認してください。
-   - データベースのプロパティ: 名前(title), 行った(checkbox), カテゴリ(select), 優先度(select), 場所(place), URL(url), メモ(rich_text)
+   `add_place` ツールを使用してNotionデータベースに新しいアイテムを作成します。
+   - 引数:
+     - name: 場所の名前（必須）
+     - category: 「旅行」「飲食店」「買い物」「その他」から選択（デフォルト: その他）
+     - priority: 「高」「中」「低」から選択（デフォルト: 中）
+     - memo: メモ（任意）
+   - 必要に応じてユーザーにカテゴリや優先度を確認してください
 
 3. **場所に関する情報検索**: 「〇〇について調べて」「△△の情報を教えて」と言われた場合、
    Web検索を行って情報を提供します。
@@ -222,7 +286,7 @@ def create_agent(session_id: Optional[str] = None, actor_id: Optional[str] = Non
         system_prompt=SYSTEM_PROMPT,
         tools=[
             notion_mcp,
-            http_request,
+            add_place,
             tavily_search,
         ],
         model="jp.anthropic.claude-haiku-4-5-20251001-v1:0",

@@ -1,8 +1,12 @@
 ---
 name: deploy-lambda
 description: |
-  Lambda + API GatewayによるLINE Webhook環境のTerraformデプロイ手順。
-  使用タイミング: (1) 初回デプロイ、(2) コード変更後の再デプロイ、(3) 設定変更、(4) Webhook URLの確認、(5) リソースの削除
+  このスキルはユーザーが以下のように言った場合に使用してください：
+  - 「Lambdaをデプロイして」「Lambda環境をデプロイ」
+  - 「Webhook URLを確認して」「LINE Webhook設定」
+  - 「Terraformでデプロイ」「terraform apply」
+  - 「API Gatewayのデプロイ」「インフラをデプロイ」
+  LINE Webhook用のLambda + API Gateway環境をTerraformでデプロイします。
 ---
 
 # Lambda Deploy
