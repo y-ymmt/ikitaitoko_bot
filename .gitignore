@@ -50,3 +50,11 @@ logs/
 agentcore-config.yaml
 .bedrock_agentcore.yaml
 .bedrock_agentcore/
+
+# Terraform
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.*
+terraform/.terraform.lock.hcl
+terraform/terraform.tfvars
+terraform/*.zip

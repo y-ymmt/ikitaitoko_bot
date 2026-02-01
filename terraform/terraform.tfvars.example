@@ -1,0 +1,5 @@
+aws_region                = "ap-northeast-1"
+project_name              = "ikitaitoko-bot"
+line_channel_access_token = "your-line-channel-access-token"
+line_channel_secret       = "your-line-channel-secret"
+agentcore_runtime_id      = "your-agentcore-runtime-id"

@@ -102,6 +102,59 @@ agentcore invoke '{"prompt": "行きたいところリストを見せて"}'
 agentcore destroy
 ```
 
+### Lambda + API Gateway によるLINE Webhook のデプロイ
+
+AgentCore RuntimeはHTTPエンドポイントを直接公開しないため、Lambda + API GatewayでLINE Webhookを受け取り、AgentCoreを呼び出します。
+
+#### 1. Terraform設定
+
+```bash
+cd terraform
+cp terraform.tfvars.example terraform.tfvars
+```
+
+`terraform.tfvars` を編集:
+
+```hcl
+aws_region                = "ap-northeast-1"
+project_name              = "ikitaitoko-bot"
+line_channel_access_token = "YOUR_LINE_CHANNEL_ACCESS_TOKEN"
+line_channel_secret       = "YOUR_LINE_CHANNEL_SECRET"
+agentcore_runtime_id      = "agentcore_app-XXXXX"  # agentcore statusで確認
+```
+
+#### 2. デプロイ
+
+```bash
+terraform init
+terraform apply
+```
+
+#### 3. LINE Webhook URLの設定
+
+1. Terraformの出力に表示される `webhook_url` をコピー
+2. [LINE Developers Console](https://developers.line.biz/console/) にアクセス
+3. 対象のMessaging APIチャネルを選択
+4. Messaging API設定 > Webhook URL に設定
+5. 「検証」ボタンで動作確認
+6. Webhookを有効化
+
+#### 4. 再デプロイ
+
+コード変更後:
+
+```bash
+cd terraform
+terraform apply
+```
+
+#### 5. リソース削除
+
+```bash
+cd terraform
+terraform destroy
+```
+
 ### AgentCore Memory の管理
 
 会話履歴を保持するためのMemoryリソースを管理できます。
@@ -139,12 +192,17 @@ LINE グループで Bot をメンションして話しかけてください：
 
 ```
 ikitaitoko_bot/
-├── agent.py           # ローカル実行用（Flask + LINE Webhook）
-├── agentcore_app.py   # AgentCore Runtime用エントリポイント
-├── line_handler.py    # LINE Webhook処理
-├── requirements.txt   # Python依存パッケージ
-├── .env.example       # 環境変数テンプレート
-├── .gitignore
+├── agent.py              # ローカル実行用（Flask + LINE Webhook）
+├── agentcore_app.py      # AgentCore Runtime用エントリポイント
+├── requirements.txt      # Python依存パッケージ
+├── .env.example          # 環境変数テンプレート
+├── lambda/
+│   └── handler.py        # LINE Webhook Lambda関数
+├── terraform/
+│   ├── main.tf           # Terraformリソース定義
+│   ├── variables.tf      # 変数定義
+│   ├── outputs.tf        # 出力定義
+│   └── terraform.tfvars.example
 └── README.md
 ```
 
