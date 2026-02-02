@@ -12,16 +12,16 @@ import logging
 import os
 from typing import Optional
 
-import requests as requests_lib
 from dotenv import load_dotenv
 from flask import Flask, abort, request
 from linebot.v3.exceptions import InvalidSignatureError
 from mcp import StdioServerParameters, stdio_client
-from strands import Agent, tool
+from strands import Agent
 from strands.tools.mcp import MCPClient
 from strands_tools.tavily import tavily_search
 
 from line_handler import LineHandler
+from tools import add_place, find_nearby_places, geocode, get_distance
 
 # 環境変数を読み込み
 load_dotenv()
@@ -83,66 +83,6 @@ line_handler = LineHandler(LINE_CHANNEL_ACCESS_TOKEN, LINE_CHANNEL_SECRET)
 NOTION_DATA_SOURCE_ID = os.environ.get("NOTION_DATA_SOURCE_ID", "")
 
 
-@tool
-def add_place(
-    name: str,
-    category: str = "その他",
-    priority: str = "中",
-    memo: str = "",
-) -> str:
-    """
-    行きたいところリストに新しい場所を追加します。
-
-    Args:
-        name: 追加する場所の名前（必須）
-        category: カテゴリ。「旅行」「飲食店」「買い物」「その他」のいずれか。デフォルトは「その他」
-        priority: 優先度。「高」「中」「低」のいずれか。デフォルトは「中」
-        memo: メモ（任意）
-
-    Returns:
-        作成結果のメッセージ
-    """
-    valid_categories = ["旅行", "飲食店", "買い物", "その他"]
-    valid_priorities = ["高", "中", "低"]
-
-    if category not in valid_categories:
-        category = "その他"
-    if priority not in valid_priorities:
-        priority = "中"
-
-    url = "https://api.notion.com/v1/pages"
-    headers = {
-        "Authorization": f"Bearer {NOTION_TOKEN}",
-        "Content-Type": "application/json",
-        "Notion-Version": "2022-06-28",
-    }
-
-    properties = {
-        "名前": {"title": [{"type": "text", "text": {"content": name}}]},
-        "カテゴリ": {"select": {"name": category}},
-        "優先度": {"select": {"name": priority}},
-        "行った": {"checkbox": False},
-    }
-
-    if memo:
-        properties["メモ"] = {"rich_text": [{"type": "text", "text": {"content": memo}}]}
-
-    payload = {
-        "parent": {"database_id": NOTION_DATABASE_ID},
-        "properties": properties,
-    }
-
-    try:
-        response = requests_lib.post(url, headers=headers, json=payload, timeout=30)
-        response.raise_for_status()
-        result = response.json()
-        page_url = result.get("url", "")
-        return f"「{name}」を行きたいところリストに追加しました！\nカテゴリ: {category}\n優先度: {priority}"
-    except requests_lib.exceptions.RequestException as e:
-        logger.error(f"Failed to add place: {e}")
-        return f"場所の追加に失敗しました: {str(e)}"
-
-
 # システムプロンプト
 SYSTEM_PROMPT = f"""あなたは「行きたいところリスト」を管理するアシスタントです。
 ユーザーからのLINEメッセージに対して、親切で簡潔に日本語で応答してください。
@@ -161,11 +101,26 @@ SYSTEM_PROMPT = f"""あなたは「行きたいところリスト」を管理す
      - category: 「旅行」「飲食店」「買い物」「その他」から選択（デフォルト: その他）
      - priority: 「高」「中」「低」から選択（デフォルト: 中）
      - memo: メモ（任意）
+     - address: 住所（任意、距離検索に使用）
    - 必要に応じてユーザーにカテゴリや優先度を確認してください
+   - 可能であれば住所も聞いてください（距離検索に使用できます）
 
 3. **場所に関する情報検索**: 「〇〇について調べて」「△△の情報を教えて」と言われた場合、
    Web検索を行って情報を提供します。
    - 検索結果を要約して、わかりやすく伝えてください。
+
+4. **近くの場所検索**: 「〇〇から近い場所は？」「新宿駅周辺でリストにあるものは？」と言われた場合、
+   `find_nearby_places` ツールを使用して、指定地点から近い順に場所を検索します。
+   - 引数:
+     - reference_location: 基準となる場所（住所または場所名）
+     - max_distance_km: 検索する最大距離（km）。デフォルトは10km
+   - リスト内の各場所の「住所」プロパティを元に距離を計算します
+
+5. **距離の計算**: 「〇〇から△△までの距離は？」と言われた場合、
+   `get_distance` ツールを使用して2点間の直線距離を計算します。
+
+6. **座標の取得**: 「〇〇の座標は？」と言われた場合、
+   `geocode` ツールを使用して住所や場所名から座標を取得します。
 
 ## 応答のガイドライン
 
@@ -288,6 +243,9 @@ def create_agent(session_id: Optional[str] = None, actor_id: Optional[str] = Non
             notion_mcp,
             add_place,
             tavily_search,
+            geocode,
+            get_distance,
+            find_nearby_places,
         ],
         model="jp.anthropic.claude-haiku-4-5-20251001-v1:0",
         session_manager=session_manager,
