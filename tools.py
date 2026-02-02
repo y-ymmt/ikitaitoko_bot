@@ -22,7 +22,6 @@ logger = logging.getLogger(__name__)
 # 環境変数
 NOTION_TOKEN = os.environ.get("NOTION_TOKEN", "")
 NOTION_DATABASE_ID = os.environ.get("NOTION_DATABASE_ID", "")
-GOOGLE_MAPS_API_KEY = os.environ.get("GOOGLE_MAPS_API_KEY", "")
 
 
 # =============================================================================
@@ -30,7 +29,7 @@ GOOGLE_MAPS_API_KEY = os.environ.get("GOOGLE_MAPS_API_KEY", "")
 # =============================================================================
 
 
-def _geocode_gsi(query: str) -> Optional[tuple[float, float]]:
+def geocode_address(query: str) -> Optional[tuple[float, float]]:
     """
     国土地理院APIで住所/場所名から座標を取得します。
 
@@ -58,72 +57,6 @@ def _geocode_gsi(query: str) -> Optional[tuple[float, float]]:
     except Exception as e:
         logger.warning(f"GSI geocode failed for {query}: {e}")
         return None
-
-
-def _geocode_google(query: str) -> Optional[tuple[float, float]]:
-    """
-    Google Maps Geocoding APIで住所/場所名から座標を取得します。
-
-    Args:
-        query: 住所または場所名
-
-    Returns:
-        (緯度, 経度) のタプル。見つからない場合はNone
-    """
-    if not GOOGLE_MAPS_API_KEY:
-        logger.debug("Google Maps API key not configured")
-        return None
-
-    try:
-        url = "https://maps.googleapis.com/maps/api/geocode/json"
-        response = requests.get(
-            url,
-            params={
-                "address": query,
-                "key": GOOGLE_MAPS_API_KEY,
-                "language": "ja",
-                "region": "jp",
-            },
-            timeout=10,
-        )
-        response.raise_for_status()
-        data = response.json()
-
-        if data.get("status") == "OK" and data.get("results"):
-            location = data["results"][0]["geometry"]["location"]
-            lat, lon = location["lat"], location["lng"]
-            logger.info(f"Google geocode success: {query} -> ({lat}, {lon})")
-            return (lat, lon)
-
-        logger.info(f"Google geocode: no results for {query} (status: {data.get('status')})")
-        return None
-
-    except Exception as e:
-        logger.warning(f"Google geocode failed for {query}: {e}")
-        return None
-
-
-def geocode_address(query: str) -> Optional[tuple[float, float]]:
-    """
-    住所/場所名から座標を取得します（国土地理院 → Google Maps の順でフォールバック）。
-
-    Args:
-        query: 住所または場所名
-
-    Returns:
-        (緯度, 経度) のタプル。見つからない場合はNone
-    """
-    # まず国土地理院APIを試す
-    result = _geocode_gsi(query)
-    if result:
-        return result
-
-    # 見つからなければGoogle Maps APIを試す
-    result = _geocode_google(query)
-    if result:
-        return result
-
-    return None
 
 
 def calculate_distance_km(
