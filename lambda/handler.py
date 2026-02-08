@@ -75,21 +75,26 @@ def verify_signature(body: str, signature: str) -> bool:
 
 def process_event(event: dict):
     """イベントを処理"""
-    # テキストメッセージのみ処理
     if event.get('type') != 'message':
         return
-    if event.get('message', {}).get('type') != 'text':
+
+    message = event.get('message', {})
+    message_type = message.get('type')
+
+    # 位置情報メッセージの処理
+    if message_type == 'location':
+        user_message = extract_location_text(message)
+    elif message_type == 'text':
+        # Botがメンションされているかチェック
+        if not is_bot_mentioned(event):
+            print('Bot was not mentioned, skipping')
+            return
+        user_message = extract_message_text(event)
+    else:
         return
 
-    # Botがメンションされているかチェック
-    if not is_bot_mentioned(event):
-        print('Bot was not mentioned, skipping')
-        return
-
-    # メッセージテキストを抽出
-    user_message = extract_message_text(event)
     if not user_message:
-        print('Empty message after mention removal, skipping')
+        print('Empty message, skipping')
         return
 
     reply_to_id = get_reply_to_id(event)
@@ -150,6 +155,24 @@ def extract_message_text(event: dict) -> str:
 
     # 余分な空白を整理
     return ' '.join(text.split()).strip()
+
+
+def extract_location_text(message: dict) -> str:
+    """位置情報メッセージをテキストに変換"""
+    title = message.get('title', '')
+    address = message.get('address', '')
+    latitude = message.get('latitude')
+    longitude = message.get('longitude')
+
+    parts = ['ユーザーが現在地を共有しました。']
+    if title:
+        parts.append(f'場所名: {title}')
+    if address:
+        parts.append(f'住所: {address}')
+    if latitude is not None and longitude is not None:
+        parts.append(f'緯度: {latitude}, 経度: {longitude}')
+
+    return '\n'.join(parts)
 
 
 def get_reply_to_id(event: dict) -> str:
