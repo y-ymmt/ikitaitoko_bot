@@ -171,6 +171,7 @@ def extract_location_text(message: dict) -> str:
         parts.append(f'住所: {address}')
     if latitude is not None and longitude is not None:
         parts.append(f'緯度: {latitude}, 経度: {longitude}')
+    parts.append('この現在地を使って、近くにある行きたいところリストの場所を検索してください。')
 
     return '\n'.join(parts)
 
