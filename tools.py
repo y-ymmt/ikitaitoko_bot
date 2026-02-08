@@ -182,6 +182,8 @@ def add_place(
         "properties": properties,
     }
 
+    logger.info(f"Creating Notion page with properties: {list(properties.keys())}")
+
     try:
         response = requests.post(url, headers=headers, json=payload, timeout=30)
         response.raise_for_status()
