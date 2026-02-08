@@ -154,6 +154,7 @@ SYSTEM_PROMPT = f"""あなたは「行きたいところリスト」を管理す
 
 - **場所の追加には必ず `add_place` ツールを使用してください。** Notion MCPの `API-post-page` や `API-create-a-page` で代替しないでください。
 - Notion MCPツール（`API-query-data-source`、`API-retrieve-a-database`、`API-update-a-page`）はリストの参照・検索・更新・削除にのみ使用してください。
+- **場所の詳細情報（営業時間、口コミ、特徴など）をNotionに記載する場合は、「メモ」プロパティではなく、ページ本文にブロックとして追加してください。** Notion MCPの `API-append-block-children` を使い、該当ページIDに対してブロック（paragraph、heading、bulleted_list_itemなど）を追加してください。「メモ」プロパティは短い一言メモにのみ使用してください。
 - ツールがエラーを返した場合でも、ユーザーが再試行を求めたら**必ず実際にツールを再度呼び出してください**。過去の失敗結果だけで判断せず、毎回実際にツールを実行してください。エラーはサーバー側の一時的な問題で解消されている可能性があります。
 
 ## 応答のガイドライン
