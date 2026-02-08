@@ -1,0 +1,18 @@
+[project]
+name = "ikitaitoko-bot"
+version = "0.1.0"
+description = "LINE Bot AI Agent for managing 行きたいところリスト with Notion integration"
+requires-python = ">=3.12"
+dependencies = [
+    "strands-agents>=0.1.0",
+    "strands-agents-tools>=0.1.0",
+    "bedrock-agentcore[strands-agents]>=0.1.0",
+    "bedrock-agentcore-starter-toolkit>=0.1.0",
+    "line-bot-sdk>=3.0.0",
+    "flask>=3.0.0",
+    "mcp>=1.0.0",
+    "boto3>=1.34.0",
+    "python-dotenv>=1.0.0",
+    "requests>=2.31.0",
+    "tavily-python>=0.3.0",
+]

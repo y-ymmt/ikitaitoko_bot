@@ -11,7 +11,9 @@
 import logging
 import math
 import os
+from datetime import datetime
 from typing import Optional
+from zoneinfo import ZoneInfo
 
 import requests
 
@@ -96,6 +98,32 @@ def calculate_distance_km(
 # =============================================================================
 # Strands ツール定義
 # =============================================================================
+
+
+# 日本のタイムゾーン
+JST = ZoneInfo("Asia/Tokyo")
+
+# 日本語の曜日名
+_WEEKDAY_NAMES = ["月", "火", "水", "木", "金", "土", "日"]
+
+
+@tool
+def get_current_datetime() -> str:
+    """
+    現在の日時を日本標準時（JST）で取得します。
+
+    Returns:
+        現在の日時情報（日本語フォーマット、曜日・週番号付き）
+    """
+    now = datetime.now(JST)
+    weekday = _WEEKDAY_NAMES[now.weekday()]
+    iso_week = now.isocalendar()[1]
+
+    return (
+        f"現在の日時: {now.year}年{now.month}月{now.day}日（{weekday}）"
+        f"{now.hour:02d}:{now.minute:02d} JST"
+        f"\n第{iso_week}週"
+    )
 
 
 @tool

@@ -15,7 +15,7 @@ from strands import Agent
 from strands.tools.mcp import MCPClient
 from strands_tools.tavily import tavily_search
 
-from tools import add_place, find_nearby_places, geocode, get_distance
+from tools import add_place, find_nearby_places, geocode, get_current_datetime, get_distance
 
 # 環境変数を読み込み
 load_dotenv()
@@ -113,6 +113,9 @@ SYSTEM_PROMPT = f"""あなたは「行きたいところリスト」を管理す
 7. **座標の取得**: 「〇〇の座標は？」と言われた場合、
    `geocode` ツールを使用して住所や場所名から座標を取得します。
 
+8. **現在日時の取得**: 「今何時？」「今日の日付は？」と言われた場合、
+   `get_current_datetime` ツールを使用して現在の日時を取得します。
+
 ## 応答のガイドライン
 
 - 簡潔で親しみやすい口調で応答してください。
@@ -173,6 +176,7 @@ def get_agent() -> Agent:
                 geocode,
                 get_distance,
                 find_nearby_places,
+                get_current_datetime,
             ],
             model="jp.anthropic.claude-haiku-4-5-20251001-v1:0",
         )
