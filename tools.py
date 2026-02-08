@@ -175,7 +175,7 @@ def add_place(
         properties["メモ"] = {"rich_text": [{"type": "text", "text": {"content": memo}}]}
 
     if address:
-        properties["住所"] = {"rich_text": [{"type": "text", "text": {"content": address}}]}
+        properties["場所"] = {"rich_text": [{"type": "text", "text": {"content": address}}]}
 
     payload = {
         "parent": {"database_id": NOTION_DATABASE_ID},
@@ -189,6 +189,10 @@ def add_place(
         if address:
             result_msg += f"\n住所: {address}"
         return result_msg
+    except requests.exceptions.HTTPError as e:
+        error_body = e.response.text if e.response is not None else "No response body"
+        logger.error(f"Failed to add place: {e} - Response: {error_body}")
+        return f"場所の追加に失敗しました: {str(e)}\n詳細: {error_body}"
     except requests.exceptions.RequestException as e:
         logger.error(f"Failed to add place: {e}")
         return f"場所の追加に失敗しました: {str(e)}"
@@ -314,7 +318,7 @@ def find_nearby_places(
         name = title_list[0].get("plain_text", "（名前なし）") if title_list else "（名前なし）"
 
         # 住所を取得
-        address_prop = props.get("住所", {})
+        address_prop = props.get("場所", {})
         rich_text_list = address_prop.get("rich_text", [])
         address = rich_text_list[0].get("plain_text", "") if rich_text_list else ""
 
