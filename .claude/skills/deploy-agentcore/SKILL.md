@@ -18,6 +18,15 @@ ikitaitoko_botをAWS Bedrock AgentCore Runtimeにデプロイする手順。
 - AWS認証情報が設定済み（`.env`にAWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY）
 - Dockerがインストール済み（コンテナビルド用）
 - 必要な環境変数が`.env`に設定済み
+- **重要**: AWS CLIコマンド（`aws logs tail`など）やagentcoreコマンドを実行する際は、必ず`.env`から環境変数を読み込むこと
+
+## Agent IDの確認
+
+Agent ID（例: `agentcore_app-XXXXXXXXXX`）は `agentcore status` の出力から確認できる。ログ確認やセッション管理で必要になる。
+
+```bash
+export $(grep -v '^#' .env | xargs) && uv run agentcore status
+```
 
 ## デプロイ手順
 
@@ -55,13 +64,13 @@ export $(grep -v '^#' .env | xargs) && uv run agentcore deploy --local-build \
 ### 4. ステータス確認
 
 ```bash
-uv run agentcore status
+export $(grep -v '^#' .env | xargs) && uv run agentcore status
 ```
 
 ### 5. テスト
 
 ```bash
-uv run agentcore invoke '{"prompt": "行きたいところリストを見せて"}'
+export $(grep -v '^#' .env | xargs) && uv run agentcore invoke '{"prompt": "行きたいところリストを見せて"}'
 ```
 
 ## 再デプロイ
@@ -80,15 +89,25 @@ export $(grep -v '^#' .env | xargs) && uv run agentcore deploy --local-build \
   --env TAVILY_API_KEY="${TAVILY_API_KEY}"
 ```
 
+### ローリングアップデートに関する注意
+
+デプロイ後、古いコンテナがしばらく残ることがある（ローリングアップデート）。既存セッションが古いコンテナにルーティングされ、修正が反映されないケースがある。
+
+対処法:
+1. デプロイ後、数分待ってからテストする
+2. 問題が続く場合はセッションをリセットする（下記「セッションリセット」を参照）
+
 ## ログ確認
+
+`<AGENT_ID>`は`agentcore status`の出力から取得すること。
 
 ```bash
 # リアルタイムログ
-aws logs tail /aws/bedrock-agentcore/runtimes/<AGENT_ID>-DEFAULT \
+export $(grep -v '^#' .env | xargs) && aws logs tail /aws/bedrock-agentcore/runtimes/<AGENT_ID>-DEFAULT \
   --log-stream-name-prefix "$(date +%Y/%m/%d)/[runtime-logs" --follow
 
 # 過去1時間のログ
-aws logs tail /aws/bedrock-agentcore/runtimes/<AGENT_ID>-DEFAULT \
+export $(grep -v '^#' .env | xargs) && aws logs tail /aws/bedrock-agentcore/runtimes/<AGENT_ID>-DEFAULT \
   --log-stream-name-prefix "$(date +%Y/%m/%d)/[runtime-logs" --since 1h
 ```
 
@@ -102,7 +121,7 @@ uv run agentcore destroy --force
 
 ```bash
 # Memory一覧
-uv run agentcore memory list
+export $(grep -v '^#' .env | xargs) && AWS_DEFAULT_REGION=ap-northeast-1 uv run agentcore memory list
 
 # Memory作成
 uv run agentcore memory create <NAME> --strategies '[{"semanticMemoryStrategy": {"name": "semantic"}}]'
@@ -110,6 +129,23 @@ uv run agentcore memory create <NAME> --strategies '[{"semanticMemoryStrategy": 
 # Memory削除
 uv run agentcore memory delete <MEMORY_ID>
 ```
+
+## セッションリセット
+
+エージェントのセッションメモリに過去のエラーが蓄積し、ツール使用を避けるなどの問題が起きた場合、セッションをリセットする。
+
+```python
+import boto3
+client = boto3.client('bedrock-agentcore', region_name='ap-northeast-1')
+client.stop_runtime_session(
+    agentRuntimeArn='arn:aws:bedrock-agentcore:ap-northeast-1:<ACCOUNT_ID>:runtime/<AGENT_ID>',
+    runtimeSessionId='<SESSION_ID>'
+)
+```
+
+- `<AGENT_ID>`: `agentcore status`から取得
+- `<ACCOUNT_ID>`: AWSアカウントID
+- `<SESSION_ID>`: ログの`sessionId`から取得（LINEユーザーIDなど）
 
 ## トラブルシューティング
 
@@ -126,3 +162,9 @@ ap-northeast-1では`jp.`プレフィックスのモデルIDを使用:
 ### 環境変数エラー
 
 `--env`フラグで必要な環境変数がすべて渡されているか確認。
+
+### デプロイ後もエラーが直らない
+
+1. ローリングアップデートで古いコンテナがまだ動いている可能性がある。数分待つ
+2. セッションメモリに過去のエラーが蓄積し、エージェントがツール使用を避けている可能性がある。セッションをリセットする
+3. ログでTool番号を確認する。新しいコンテナなら`Tool #1`から始まる。大きい番号の場合は古いコンテナ

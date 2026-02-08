@@ -19,10 +19,16 @@ LINE Messaging API Webhook用のLambda + API Gateway環境をTerraformでデプ�
 LINE Messaging API → API Gateway → Lambda → AgentCore Runtime → LINE Push Message
 ```
 
+## デプロイが必要なタイミング
+
+- `lambda/handler.py` を変更した場合 → Lambdaの再デプロイが必要
+- `terraform/` 配下のインフラ定義を変更した場合 → Terraformの再デプロイが必要
+- `tools.py`、`agent.py`、`agentcore_app.py` のみの変更 → **Lambda側のデプロイは不要**（AgentCoreのみデプロイすればよい）
+
 ## 前提条件
 
 - Terraform >= 1.0
-- AWS CLI設定済み
+- AWS認証情報が設定済み（`.env`にAWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY）
 - AgentCore Runtimeがデプロイ済み
 
 ## ディレクトリ構成
@@ -55,9 +61,7 @@ cp terraform.tfvars.example terraform.tfvars
 ### 2. デプロイ
 
 ```bash
-cd terraform
-terraform init
-terraform apply
+export $(grep -v '^#' .env | xargs) && cd terraform && terraform init && terraform apply
 ```
 
 出力されるWebhook URLをLINE Developers Consoleに設定。
@@ -65,28 +69,27 @@ terraform apply
 ## 再デプロイ
 
 ```bash
-cd terraform
-terraform apply
+export $(grep -v '^#' .env | xargs) && cd terraform && terraform apply -auto-approve
 ```
+
+**重要**: `export $(grep -v '^#' .env | xargs)` でAWS認証情報を読み込まないとTerraformが認証エラーになる。
 
 ## Webhook URL確認
 
 ```bash
-cd terraform
-terraform output webhook_url
+export $(grep -v '^#' .env | xargs) && cd terraform && terraform output webhook_url
 ```
 
 ## ログ確認
 
 ```bash
-aws logs tail /aws/lambda/ikitaitoko-bot-webhook --follow
+export $(grep -v '^#' .env | xargs) && aws logs tail /aws/lambda/ikitaitoko-bot-webhook --follow
 ```
 
 ## リソース削除
 
 ```bash
-cd terraform
-terraform destroy
+export $(grep -v '^#' .env | xargs) && cd terraform && terraform destroy
 ```
 
 ## トラブルシューティング
@@ -104,3 +107,7 @@ LINE_CHANNEL_SECRETが正しいか確認。
 ### タイムアウト
 
 Lambda関数のタイムアウトは300秒（5分）に設定済み。AgentCoreの応答が遅い場合は増やす。
+
+### No valid credential sources
+
+Terraformコマンドの前に`export $(grep -v '^#' .env | xargs)`でAWS認証情報を読み込むこと。
