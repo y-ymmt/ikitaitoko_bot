@@ -6,6 +6,7 @@
 - geocode: 住所/場所名から座標を取得
 - calculate_distance: 2点間の距離を計算
 - find_nearby_places: 指定地点から近い場所を検索
+- get_google_maps_route_url: Googleマップの経路URLを生成
 """
 
 import logging
@@ -13,6 +14,7 @@ import math
 import os
 from datetime import datetime
 from typing import Optional
+from urllib.parse import quote
 from zoneinfo import ZoneInfo
 
 import requests
@@ -367,3 +369,68 @@ def find_nearby_places(
             result_lines.append(f"  ... 他 {len(places_without_address) - 5} 件")
 
     return "\n".join(result_lines)
+
+
+# Googleマップの移動手段マッピング
+_TRAVEL_MODE_MAP = {
+    "車": "driving",
+    "driving": "driving",
+    "電車": "transit",
+    "transit": "transit",
+    "徒歩": "walking",
+    "walking": "walking",
+    "自転車": "bicycling",
+    "bicycling": "bicycling",
+}
+
+
+@tool
+def get_google_maps_route_url(
+    origin: str,
+    destination: str,
+    waypoints: str = "",
+    travel_mode: str = "",
+) -> str:
+    """
+    Googleマップで経路を表示するURLを生成します。
+
+    Args:
+        origin: 出発地（場所名または住所、例: "新宿駅"、"東京都渋谷区道玄坂1-1"）
+        destination: 目的地（場所名または住所、例: "東京タワー"）
+        waypoints: 経由地。複数ある場合は「|」で区切る（例: "渋谷駅|品川駅"）。省略可
+        travel_mode: 移動手段。「車」「電車」「徒歩」「自転車」のいずれか。省略するとGoogleマップのデフォルト
+
+    Returns:
+        Googleマップの経路URL
+    """
+    params = [
+        f"origin={quote(origin)}",
+        f"destination={quote(destination)}",
+    ]
+
+    # 経由地: 各地点を個別にエンコードし、パイプで結合（パイプ自体はエンコードしない）
+    waypoint_list = [wp.strip() for wp in waypoints.split("|") if wp.strip()] if waypoints else []
+    if waypoint_list:
+        encoded_waypoints = "|".join(quote(wp) for wp in waypoint_list)
+        params.append(f"waypoints={encoded_waypoints}")
+
+    # 移動手段
+    resolved_mode = ""
+    if travel_mode:
+        resolved_mode = _TRAVEL_MODE_MAP.get(travel_mode.lower(), "")
+        if resolved_mode:
+            params.append(f"travelmode={resolved_mode}")
+
+    url = "https://www.google.com/maps/dir/?api=1&" + "&".join(params)
+
+    result = f"Googleマップで経路を確認:\n{url}"
+    result += f"\n\n出発地: {origin}\n目的地: {destination}"
+    if waypoint_list:
+        result += f"\n経由地: {' → '.join(waypoint_list)}"
+    if travel_mode:
+        if resolved_mode:
+            result += f"\n移動手段: {travel_mode}"
+        else:
+            result += f"\n※ 移動手段「{travel_mode}」は無効です。Googleマップのデフォルトが使用されます。"
+
+    return result

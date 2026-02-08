@@ -21,7 +21,14 @@ from strands.tools.mcp import MCPClient
 from strands_tools.tavily import tavily_search
 
 from line_handler import LineHandler
-from tools import add_place, find_nearby_places, geocode, get_current_datetime, get_distance
+from tools import (
+    add_place,
+    find_nearby_places,
+    geocode,
+    get_current_datetime,
+    get_distance,
+    get_google_maps_route_url,
+)
 
 # 環境変数を読み込み
 load_dotenv()
@@ -103,7 +110,7 @@ SYSTEM_PROMPT = f"""あなたは「行きたいところリスト」を管理す
      - memo: メモ（任意）
      - address: 住所（任意、距離検索に使用）
    - 必要に応じてユーザーにカテゴリや優先度を確認してください
-   - 可能であれば住所も聞いてください（距離検索に使用できます）
+   - **住所は必ず埋めてください**。会話の内容から住所を特定できる場合はそのまま使用し、特定できない場合はユーザーに質問してください。ユーザーが答えない・空を指定した場合のみ空のままにしてください
 
 3. **場所に関する情報検索**: 「〇〇について調べて」「△△の情報を教えて」と言われた場合、
    Web検索を行って情報を提供します。
@@ -124,6 +131,15 @@ SYSTEM_PROMPT = f"""あなたは「行きたいところリスト」を管理す
 
 7. **現在日時の取得**: 「今何時？」「今日の日付は？」と言われた場合、
    `get_current_datetime` ツールを使用して現在の日時を取得します。
+
+8. **Googleマップで経路を表示**: 「〇〇から△△への行き方は？」「〇〇への経路を教えて」と言われた場合、
+   `get_google_maps_route_url` ツールを使用してGoogleマップの経路URLを生成します。
+   - 引数:
+     - origin: 出発地（場所名または住所）
+     - destination: 目的地（場所名または住所）
+     - waypoints: 経由地（「|」区切りで複数指定可能、省略可）
+     - travel_mode: 移動手段（「車」「電車」「徒歩」「自転車」、省略可）
+   - 距離計算の結果と組み合わせて、経路URLも一緒に提供すると便利です
 
 ## 応答のガイドライン
 
@@ -250,6 +266,7 @@ def create_agent(session_id: Optional[str] = None, actor_id: Optional[str] = Non
             get_distance,
             find_nearby_places,
             get_current_datetime,
+            get_google_maps_route_url,
         ],
         model="jp.anthropic.claude-haiku-4-5-20251001-v1:0",
         session_manager=session_manager,
