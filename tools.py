@@ -135,6 +135,7 @@ def add_place(
     priority: str = "中",
     memo: str = "",
     address: str = "",
+    url: str = "",
 ) -> str:
     """
     行きたいところリストに新しい場所を追加します。
@@ -145,6 +146,7 @@ def add_place(
         priority: 優先度。「高」「中」「低」のいずれか。デフォルトは「中」
         memo: メモ（任意）
         address: 住所（任意）。距離検索に使用されます
+        url: 関連URL（任意）。公式サイト、グルメサイト、GoogleマップなどのURL
 
     Returns:
         作成結果のメッセージ
@@ -177,6 +179,9 @@ def add_place(
     if address:
         properties["場所"] = {"rich_text": [{"type": "text", "text": {"content": address}}]}
 
+    if url:
+        properties["URL"] = {"url": url}
+
     payload = {
         "parent": {"database_id": NOTION_DATABASE_ID},
         "properties": properties,
@@ -190,6 +195,8 @@ def add_place(
         result_msg = f"「{name}」を行きたいところリストに追加しました！\nカテゴリ: {category}\n優先度: {priority}"
         if address:
             result_msg += f"\n住所: {address}"
+        if url:
+            result_msg += f"\nURL: {url}"
         return result_msg
     except requests.exceptions.HTTPError as e:
         error_body = e.response.text if e.response is not None else "No response body"
